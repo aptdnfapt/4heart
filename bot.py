@@ -13,6 +13,7 @@ DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 DESIGNATED_CHANNEL_ID_STR = os.getenv("DESIGNATED_CHANNEL_ID")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-pro") # Default to gemini-pro if not set
 
 # --- Logging Setup ---
 logging.basicConfig(
@@ -50,26 +51,39 @@ bot = commands.Bot(command_prefix="!", intents=intents) # Using a dummy prefix f
 # --- Gemini API Setup ---
 try:
     genai.configure(api_key=GEMINI_API_KEY)
-    # For text-only, use gemini-pro. For multimodal, use gemini-pro-vision
-    model = genai.GenerativeModel('gemini-pro')
-    logger.info("Gemini API client configured successfully.")
+    # Use the model name from environment variables
+    model = genai.GenerativeModel(GEMINI_MODEL_NAME)
+    logger.info(f"Gemini API client configured successfully with model: {GEMINI_MODEL_NAME}")
 except Exception as e:
-    logger.critical(f"Failed to configure Gemini API client: {e}")
+    logger.critical(f"Failed to configure Gemini API client with model {GEMINI_MODEL_NAME}: {e}")
     model = None # Ensure model is None if setup fails
 
-async def get_gemini_response(prompt_text: str) -> str | None:
-    """Gets a response from the Gemini API."""
+# --- Placeholder for Single Persona Prompt (Phase 1) ---
+# In later phases, this will be managed by the PersonaManager and will be more complex,
+# including conversation history and dynamic elements.
+SINGLE_PERSONA_PROMPT = """
+You are Luna, a cheerful and friendly AI persona designed to chat with users in a Discord channel.
+You are one of several AI sisters/friends in this channel.
+Respond to the user's message in a friendly and engaging manner.
+Keep your responses relatively concise.
+"""
+
+async def get_gemini_response(user_message_content: str) -> str | None:
+    """Gets a response from the Gemini API using the single persona prompt."""
     if not model:
         logger.error("Gemini model is not initialized. Cannot get response.")
         return None
     try:
+        # Combine the persona prompt with the user's message
+        full_prompt = f"{SINGLE_PERSONA_PROMPT}\nUser said: {user_message_content}\nYour response:"
+
         # For simplicity, using generate_content for now.
-        # For chat-like behavior, model.start_chat(history=[]) would be better.
-        response = await model.generate_content_async(prompt_text)
+        # For chat-like behavior, model.start_chat(history=[]) would be better in later phases.
+        response = await model.generate_content_async(full_prompt)
+
         # Ensure we handle potential API errors or empty responses gracefully
         if response and response.parts:
             # Assuming the first part contains the text response
-            # You might need to inspect response.parts more carefully depending on the model and usage
             candidate = response.candidates[0]
             if candidate.content and candidate.content.parts:
                  return "".join(part.text for part in candidate.content.parts if hasattr(part, 'text'))
@@ -89,7 +103,7 @@ async def on_ready():
     logger.info(f"Operating in channel ID: {DESIGNATED_CHANNEL_ID}" if DESIGNATED_CHANNEL_ID else "No specific DESIGNATED_CHANNEL_ID set.")
     logger.info("Bot is ready and listening for messages.")
     # You can set the bot's presence here if desired
-    # await bot.change_presence(activity=discord.Game(name="Truth or Dare"))
+    # await bot.change_presence(activity=discord.Game(name="Chatting with friends!")) # Example presence
 
 # --- Main Bot Logic (to be expanded) ---
 @bot.event
@@ -106,20 +120,103 @@ async def on_message(message: discord.Message):
 
     logger.info(f"Message from {message.author.name} in #{message.channel.name}: {message.content}")
 
-    # --- Basic AI Response (Single Persona - Phase 1) ---
-    # For now, any message in the designated channel will be sent to the AI.
-    # This is a very simple interaction, no real "persona" yet.
-    
-    # Construct a very simple prompt
-    # In later phases, this will be much more sophisticated, including persona details,
-    # conversation history, and NLU results.
-    user_message_content = message.content
-    
-    # Simple prompt for now - acts like a generic chatbot
-    # TODO: Replace with persona-specific prompting later
-    prompt = f"User '{message.author.name}' said: {user_message_content}\nRespond to the user as a friendly AI."
+    user_message_content = message.content.lower() # Convert to lowercase for simpler matching
 
-    ai_response_text = await get_gemini_response(prompt)
+    # --- Simple NLU for Greetings (Phase 1) ---
+    # This is a very basic check. More sophisticated NLU will be added later.
+    greeting_keywords = ["hi", "hello", "hey", "greetings", "o/", "👋"]
+
+    is_greeting = any(keyword in user_message_content for keyword in greeting_keywords)
+
+import datetime # Import datetime module
+
+# ... (rest of imports and configuration) ...
+
+# --- Placeholder for Single Persona Prompt (Phase 1) ---
+# In later phases, this will be managed by the PersonaManager and will be more complex,
+# including conversation history and dynamic elements.
+SINGLE_PERSONA_PROMPT = """
+You are Luna, a cheerful and friendly AI persona designed to chat with users in a Discord channel.
+You are one of several AI sisters/friends in this channel.
+Respond to the user's message in a friendly and engaging manner.
+Keep your responses relatively concise.
+"""
+
+async def get_gemini_response(user_message_content: str, context: str = "") -> str | None:
+    """Gets a response from the Gemini API using the single persona prompt and additional context."""
+    if not model:
+        logger.error("Gemini model is not initialized. Cannot get response.")
+        return None
+    try:
+        # Combine the persona prompt, context, and user's message
+        full_prompt = f"{SINGLE_PERSONA_PROMPT}\n{context}\nUser said: {user_message_content}\nYour response:"
+
+        # For simplicity, using generate_content for now.
+        # For chat-like behavior, model.start_chat(history=[]) would be better in later phases.
+        response = await model.generate_content_async(full_prompt)
+
+        # Ensure we handle potential API errors or empty responses gracefully
+        if response and response.parts:
+            # Assuming the first part contains the text response
+            candidate = response.candidates[0]
+            if candidate.content and candidate.content.parts:
+                 return "".join(part.text for part in candidate.content.parts if hasattr(part, 'text'))
+            logger.warning(f"Gemini response did not contain expected text parts. Response: {response.text[:100] if hasattr(response, 'text') else 'No text attribute'}")
+            return None # Or some default error message
+        else:
+            logger.warning(f"Gemini response was empty or malformed. Response: {response}")
+            return None # Or some default error message
+    except Exception as e:
+        logger.error(f"Error calling Gemini API: {e}")
+        return None
+
+# ... (on_ready event) ...
+
+# --- Main Bot Logic (to be expanded) ---
+@bot.event
+async def on_message(message: discord.Message):
+    """Called when a message is sent in a channel the bot can see."""
+    if message.author == bot.user:
+        return  # Ignore messages from the bot itself
+
+    # Basic check for designated channel if set
+    if DESIGNATED_CHANNEL_ID and message.channel.id != DESIGNATED_CHANNEL_ID:
+        # Silently ignore messages not in the designated channel, or provide a gentle reminder
+        # logger.debug(f"Message received in non-designated channel {message.channel.id}, ignoring.")
+        return
+
+    logger.info(f"Message from {message.author.name} in #{message.channel.name}: {message.content}")
+
+    user_message_content = message.content.lower() # Convert to lowercase for simpler matching
+
+    # --- Simple NLU for Greetings (Phase 1) ---
+    # This is a very basic check. More sophisticated NLU will be added later.
+    greeting_keywords = ["hi", "hello", "hey", "greetings", "o/", "👋"]
+
+    is_greeting = any(keyword in user_message_content for keyword in greeting_keywords)
+
+    if is_greeting:
+        # --- Dynamic Persona Greeting Response (Phase 1) ---
+        # Send the greeting intent to the AI with persona and time context.
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        greeting_context = f"The current time is {current_time}. A user named {message.author.name} just sent a greeting."
+        ai_greeting_response = await get_gemini_response(message.content, context=greeting_context) # Use original case for AI
+
+        if ai_greeting_response:
+            await message.channel.send(ai_greeting_response)
+            logger.info(f"Responded to greeting from {message.author.name} with AI-generated response.")
+        else:
+            # Fallback to a simple hardcoded greeting if AI fails
+            fallback_greeting = f"Hi there, {message.author.name}! 👋"
+            await message.channel.send(fallback_greeting)
+            logger.warning(f"AI failed to generate greeting for {message.author.name}. Used fallback.")
+
+        return # Stop processing after responding to a greeting
+
+    # --- Basic AI Response with Persona Prompt (Single Persona - Phase 1) ---
+    # If it's not a recognized greeting, send the message to the AI with the persona prompt.
+
+    ai_response_text = await get_gemini_response(message.content) # Use original case for AI
 
     if ai_response_text:
         # Send the AI's response back to the channel

@@ -2,23 +2,21 @@
 
 ## 1. Current Work Focus
 - Continuing with **Phase 1: Basic Bot Setup & Single Persona Interaction**.
-- Implemented Gemini API client initialization and basic AI response generation in `bot.py`.
-- Next: Refine to implement a single, distinct AI persona and basic NLU for greetings.
+- Implemented dynamic AI-generated greetings and basic single persona response in `bot.py`.
+- Next: Further refine single persona implementation and begin setting up the basic database.
 
 ## 2. Recent Changes
 - `bot.py` updated:
-    - Gemini API client (`genai.GenerativeModel`) is now initialized.
-    - `get_gemini_response` async function added to call the Gemini API.
-    - `on_message` event now processes user messages, sends them to Gemini with a generic prompt, and relays the AI's response back to Discord.
-    - Basic error handling for API calls and response length included.
-- Foundational project files (`requirements.txt`, `.env.example`, initial `bot.py`) were previously created.
+    - `on_message` now sends greeting intents to the AI with time and user context to generate dynamic, in-character greetings.
+    - Includes a fallback to a hardcoded greeting if the AI fails.
+    - `get_gemini_response` function updated to accept an optional `context` parameter.
+- Basic single AI persona response using a placeholder prompt and simple NLU for greetings were previously implemented.
 
 ## 3. Next Steps (Immediate)
-- Guide user on testing the current `bot.py` functionality.
-- Begin implementing a more defined single AI persona:
-    - Create a basic persona prompt (e.g., "You are Luna, a cheerful and helpful AI friend...").
-    - Modify `on_message` in `bot.py` to use this persona prompt when interacting with Gemini.
-- Start work on "Simple NLU for greetings and basic questions" as per Phase 1.
+- Guide user on testing the updated `bot.py` functionality, specifically the dynamic greetings.
+- Refine the `SINGLE_PERSONA_PROMPT` to better capture the desired "Luna" character.
+- Add more basic NLU for simple questions (e.g., "How are you?").
+- Begin setting up the initial SQLite database for minimal state storage.
 
 ## 4. Active Decisions & Considerations
 - **Project Scope:** The project aims for a highly natural, NLU-driven interaction model for multiple AI personas, including activities like Truth or Dare. This is a complex undertaking.

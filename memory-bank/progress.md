@@ -16,9 +16,9 @@
     - Basic `discord.py` bot structure. (Partially done - core structure exists, basic events handled)
     - Configuration loading (bot token, API keys, designated channel). (Done)
     - Connection to Discord. (Done)
-    - Implementation of a single AI persona. (Started - generic AI response implemented)
-    - Basic message handling: receive user message, send to AI, display AI response. (Done for generic AI)
-    - Simple NLU for greetings and basic questions. (To Do)
+    - Implementation of a single AI persona. (In Progress - using placeholder prompt for general chat, AI-generated greetings)
+    - Basic message handling: receive user message, send to AI, display AI response. (Done - using persona prompt)
+    - Simple NLU for greetings and basic questions. (In Progress - dynamic greeting generation implemented)
     - Initial SQLite database setup for minimal state. (To Do)
 - **Phase 2: Multi-Persona Management & Interaction**
     - System for managing multiple persona profiles and prompts.
