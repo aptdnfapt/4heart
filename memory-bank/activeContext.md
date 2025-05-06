@@ -1,22 +1,24 @@
 # Active Context: AI Persona Discord Bot Collection
 
 ## 1. Current Work Focus
-- Memory Bank initialization complete.
-- Preparing to discuss the first implementation steps for the AI Persona Discord Bot Collection with the user.
+- Continuing with **Phase 1: Basic Bot Setup & Single Persona Interaction**.
+- Implemented Gemini API client initialization and basic AI response generation in `bot.py`.
+- Next: Refine to implement a single, distinct AI persona and basic NLU for greetings.
 
 ## 2. Recent Changes
-- Created `memory-bank/projectbrief.md`.
-- Created `memory-bank/productContext.md`.
-- Created `memory-bank/activeContext.md`.
-- Created `memory-bank/systemPatterns.md`.
-- Created `memory-bank/techContext.md`.
-- Created `memory-bank/progress.md`.
-- All core Memory Bank files are now initialized.
+- `bot.py` updated:
+    - Gemini API client (`genai.GenerativeModel`) is now initialized.
+    - `get_gemini_response` async function added to call the Gemini API.
+    - `on_message` event now processes user messages, sends them to Gemini with a generic prompt, and relays the AI's response back to Discord.
+    - Basic error handling for API calls and response length included.
+- Foundational project files (`requirements.txt`, `.env.example`, initial `bot.py`) were previously created.
 
 ## 3. Next Steps (Immediate)
-- Review the overall plan (as documented in the Memory Bank) with the user.
-- Discuss and define the first concrete implementation steps for Phase 1 (Basic Bot Setup & Single Persona Interaction) as outlined in `progress.md`.
-- Begin implementation of Phase 1.
+- Guide user on testing the current `bot.py` functionality.
+- Begin implementing a more defined single AI persona:
+    - Create a basic persona prompt (e.g., "You are Luna, a cheerful and helpful AI friend...").
+    - Modify `on_message` in `bot.py` to use this persona prompt when interacting with Gemini.
+- Start work on "Simple NLU for greetings and basic questions" as per Phase 1.
 
 ## 4. Active Decisions & Considerations
 - **Project Scope:** The project aims for a highly natural, NLU-driven interaction model for multiple AI personas, including activities like Truth or Dare. This is a complex undertaking.

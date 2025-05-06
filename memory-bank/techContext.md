@@ -34,6 +34,7 @@
 
 ## 5. Future Technical Enhancements (Post-MVP)
 - **Advanced NLU:** Integration with dedicated NLU libraries (e.g., Rasa, spaCy) or fine-tuning smaller LLMs for more robust intent recognition.
+- **Dedicated Preprocessing AI for Ambiguity:** If the primary NLU (via Gemini prompt engineering) struggles with ambiguous user inputs, a future enhancement could involve a separate, "fresh" AI call with a specific system prompt to preprocess and clarify user messages before they are sent to the main NLU intent/entity extraction step. This could improve overall NLU accuracy but would add latency and potential API costs.
 - **Local LLMs:** Exploring the use of self-hosted LLMs to reduce API dependency and cost, and potentially improve privacy/control. This would require significant hardware resources.
 - **Vector Database:** For more sophisticated memory and context retrieval, especially for long-term memory or recalling specific past interactions.
 - **Web Dashboard:** A simple web interface for configuring the bot or viewing stats (though this is a significant addition).

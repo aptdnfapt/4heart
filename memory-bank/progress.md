@@ -1,18 +1,25 @@
 # Progress: AI Persona Discord Bot Collection
 
-## 1. What Works (Current State: Initialization)
-- **Memory Bank Structure:** The core Memory Bank files (`projectbrief.md`, `productContext.md`, `activeContext.md`, `systemPatterns.md`, `techContext.md`, `progress.md`) are being initialized as per `.clinerules`.
-- **Project Definition:** The high-level goals, scope, and technical approach for the AI Persona Discord Bot Collection have been documented in these files based on prior discussions.
+## 1. What Works (Current State: Phase 1 - Initial Setup Complete)
+- **Memory Bank Structure:** All core Memory Bank files are initialized and up-to-date.
+- **Project Definition:** High-level goals, scope, and technical approach are documented.
+- **Basic Project Files Created:**
+    - `requirements.txt` (listing dependencies)
+    - `.env.example` (guiding environment variable setup)
+    - `bot.py` (initial structure including imports, config loading, logging, Discord client setup, `on_ready` and `on_message` stubs).
+- **Configuration Loading:** `bot.py` can load `DISCORD_BOT_TOKEN`, `GEMINI_API_KEY`, `DESIGNATED_CHANNEL_ID`, and `LOG_LEVEL` from an `.env` file.
+- **Basic Logging:** Implemented in `bot.py`.
+- **Discord Connection:** `bot.py` can connect to Discord and log a ready message. The `on_message` event logs received messages (if in the designated channel).
 
 ## 2. What's Left to Build (High-Level Roadmap)
-- **Phase 1: Basic Bot Setup & Single Persona Interaction**
-    - Basic `discord.py` bot structure.
-    - Configuration loading (bot token, API keys, designated channel).
-    - Connection to Discord.
-    - Implementation of a single AI persona.
-    - Basic message handling: receive user message, send to AI, display AI response.
-    - Simple NLU for greetings and basic questions.
-    - Initial SQLite database setup for minimal state.
+- **Phase 1: Basic Bot Setup & Single Persona Interaction (In Progress)**
+    - Basic `discord.py` bot structure. (Partially done - core structure exists, basic events handled)
+    - Configuration loading (bot token, API keys, designated channel). (Done)
+    - Connection to Discord. (Done)
+    - Implementation of a single AI persona. (Started - generic AI response implemented)
+    - Basic message handling: receive user message, send to AI, display AI response. (Done for generic AI)
+    - Simple NLU for greetings and basic questions. (To Do)
+    - Initial SQLite database setup for minimal state. (To Do)
 - **Phase 2: Multi-Persona Management & Interaction**
     - System for managing multiple persona profiles and prompts.
     - Logic for personas to respond individually and potentially interact with each other in simple ways.
