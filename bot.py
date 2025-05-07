@@ -4,6 +4,9 @@ import os
 from dotenv import load_dotenv
 import logging
 import google.generativeai as genai
+import datetime
+import asyncio
+from collections import deque
 
 # Load environment variables from .env file
 load_dotenv()
@@ -68,18 +71,21 @@ Respond to the user's message in a friendly and engaging manner.
 Keep your responses relatively concise.
 """
 
-async def get_gemini_response(user_message_content: str) -> str | None:
+# --- Message Cache Setup ---
+# Use a deque to store recent message IDs to prevent processing duplicates.
+# The maximum length determines how many recent messages are kept in memory.
+# Adjust the maxlen based on expected message volume and memory constraints.
+PROCESSED_MESSAGES_CACHE = deque(maxlen=1000) # Store up to 1000 recent message IDs
+
+async def get_gemini_response(prompt_text: str) -> str | None:
     """Gets a response from the Gemini API using the single persona prompt."""
     if not model:
         logger.error("Gemini model is not initialized. Cannot get response.")
         return None
     try:
-        # Combine the persona prompt with the user's message
-        full_prompt = f"{SINGLE_PERSONA_PROMPT}\nUser said: {user_message_content}\nYour response:"
-
         # For simplicity, using generate_content for now.
         # For chat-like behavior, model.start_chat(history=[]) would be better in later phases.
-        response = await model.generate_content_async(full_prompt)
+        response = await model.generate_content_async(prompt_text)
 
         # Ensure we handle potential API errors or empty responses gracefully
         if response and response.parts:
@@ -112,72 +118,13 @@ async def on_message(message: discord.Message):
     if message.author == bot.user:
         return  # Ignore messages from the bot itself
 
-    # Basic check for designated channel if set
-    if DESIGNATED_CHANNEL_ID and message.channel.id != DESIGNATED_CHANNEL_ID:
-        # Silently ignore messages not in the designated channel, or provide a gentle reminder
-        # logger.debug(f"Message received in non-designated channel {message.channel.id}, ignoring.")
-        return
+    # --- Duplicate Message Check ---
+    if message.id in PROCESSED_MESSAGES_CACHE:
+        logger.debug(f"Ignoring duplicate message with ID: {message.id}")
+        return # Ignore if message ID is already in cache
 
-    logger.info(f"Message from {message.author.name} in #{message.channel.name}: {message.content}")
-
-    user_message_content = message.content.lower() # Convert to lowercase for simpler matching
-
-    # --- Simple NLU for Greetings (Phase 1) ---
-    # This is a very basic check. More sophisticated NLU will be added later.
-    greeting_keywords = ["hi", "hello", "hey", "greetings", "o/", "👋"]
-
-    is_greeting = any(keyword in user_message_content for keyword in greeting_keywords)
-
-import datetime # Import datetime module
-
-# ... (rest of imports and configuration) ...
-
-# --- Placeholder for Single Persona Prompt (Phase 1) ---
-# In later phases, this will be managed by the PersonaManager and will be more complex,
-# including conversation history and dynamic elements.
-SINGLE_PERSONA_PROMPT = """
-You are Luna, a cheerful and friendly AI persona designed to chat with users in a Discord channel.
-You are one of several AI sisters/friends in this channel.
-Respond to the user's message in a friendly and engaging manner.
-Keep your responses relatively concise.
-"""
-
-async def get_gemini_response(user_message_content: str, context: str = "") -> str | None:
-    """Gets a response from the Gemini API using the single persona prompt and additional context."""
-    if not model:
-        logger.error("Gemini model is not initialized. Cannot get response.")
-        return None
-    try:
-        # Combine the persona prompt, context, and user's message
-        full_prompt = f"{SINGLE_PERSONA_PROMPT}\n{context}\nUser said: {user_message_content}\nYour response:"
-
-        # For simplicity, using generate_content for now.
-        # For chat-like behavior, model.start_chat(history=[]) would be better in later phases.
-        response = await model.generate_content_async(full_prompt)
-
-        # Ensure we handle potential API errors or empty responses gracefully
-        if response and response.parts:
-            # Assuming the first part contains the text response
-            candidate = response.candidates[0]
-            if candidate.content and candidate.content.parts:
-                 return "".join(part.text for part in candidate.content.parts if hasattr(part, 'text'))
-            logger.warning(f"Gemini response did not contain expected text parts. Response: {response.text[:100] if hasattr(response, 'text') else 'No text attribute'}")
-            return None # Or some default error message
-        else:
-            logger.warning(f"Gemini response was empty or malformed. Response: {response}")
-            return None # Or some default error message
-    except Exception as e:
-        logger.error(f"Error calling Gemini API: {e}")
-        return None
-
-# ... (on_ready event) ...
-
-# --- Main Bot Logic (to be expanded) ---
-@bot.event
-async def on_message(message: discord.Message):
-    """Called when a message is sent in a channel the bot can see."""
-    if message.author == bot.user:
-        return  # Ignore messages from the bot itself
+    # Add the message ID to the cache
+    PROCESSED_MESSAGES_CACHE.append(message.id)
 
     # Basic check for designated channel if set
     if DESIGNATED_CHANNEL_ID and message.channel.id != DESIGNATED_CHANNEL_ID:
@@ -185,41 +132,71 @@ async def on_message(message: discord.Message):
         # logger.debug(f"Message received in non-designated channel {message.channel.id}, ignoring.")
         return
 
-    logger.info(f"Message from {message.author.name} in #{message.channel.name}: {message.content}")
+    logger.info(f"Processing message from {message.author.name} in #{message.channel.name}: {message.content}")
 
     user_message_content = message.content.lower() # Convert to lowercase for simpler matching
 
-    # --- Simple NLU for Greetings (Phase 1) ---
-    # This is a very basic check. More sophisticated NLU will be added later.
+    # --- Determine Intent (Simple NLU - Phase 1) ---
+    # This is a basic intent detection. More sophisticated NLU will be added later.
+    intent = 'general_chat' # Default intent
+
     greeting_keywords = ["hi", "hello", "hey", "greetings", "o/", "👋"]
+    if any(keyword in user_message_content for keyword in greeting_keywords):
+        intent = 'greeting'
 
-    is_greeting = any(keyword in user_message_content for keyword in greeting_keywords)
+    simple_question_keywords = ["how are you", "how r u", "whats up", "what's up", "what are you doing", "what u doing"]
+    if intent == 'general_chat' and any(keyword in user_message_content for keyword in simple_question_keywords):
+        intent = 'simple_question'
 
-    if is_greeting:
-        # --- Dynamic Persona Greeting Response (Phase 1) ---
-        # Send the greeting intent to the AI with persona and time context.
+    logger.debug(f"Detected intent: {intent}")
+
+    # --- Generate AI Response Based on Intent ---
+    ai_response_text = None
+    prompt_for_ai = None
+    context_for_ai = ""
+
+    if intent == 'greeting':
         current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        greeting_context = f"The current time is {current_time}. A user named {message.author.name} just sent a greeting."
-        ai_greeting_response = await get_gemini_response(message.content, context=greeting_context) # Use original case for AI
-
-        if ai_greeting_response:
-            await message.channel.send(ai_greeting_response)
-            logger.info(f"Responded to greeting from {message.author.name} with AI-generated response.")
+        context_for_ai = f"The current time is {current_time}. A user named {message.author.name} just sent a greeting."
+        # Craft a specific prompt for the AI to generate a greeting
+        prompt_for_ai = f"{SINGLE_PERSONA_PROMPT}\n{context_for_ai}\nUser's greeting: {message.content}\nGenerate a friendly, in-character greeting response:"
+        ai_response_text = await get_gemini_response(prompt_for_ai)
+        if ai_response_text:
+            logger.info(f"Generated AI greeting response for {message.author.name}.")
         else:
-            # Fallback to a simple hardcoded greeting if AI fails
-            fallback_greeting = f"Hi there, {message.author.name}! 👋"
-            await message.channel.send(fallback_greeting)
-            logger.warning(f"AI failed to generate greeting for {message.author.name}. Used fallback.")
+            logger.warning(f"AI failed to generate greeting for {message.author.name}. Using fallback.")
+            # Fallback to a simple hardcoded greeting if AI fails for greeting
+            ai_response_text = f"Hi there, {message.author.name}! 👋"
 
-        return # Stop processing after responding to a greeting
 
-    # --- Basic AI Response with Persona Prompt (Single Persona - Phase 1) ---
-    # If it's not a recognized greeting, send the message to the AI with the persona prompt.
+    elif intent == 'simple_question':
+        context_for_ai = f"A user named {message.author.name} just asked a simple question."
+        # Craft a specific prompt for the AI to answer the question
+        prompt_for_ai = f"{SINGLE_PERSONA_PROMPT}\n{context_for_ai}\nUser's question: {message.content}\nAnswer the question in character:"
+        ai_response_text = await get_gemini_response(prompt_for_ai)
+        if ai_response_text:
+            logger.info(f"Generated AI response for simple question from {message.author.name}.")
+        else:
+            logger.warning(f"AI failed to generate response for simple question from {message.author.name}. Falling through to general chat fallback.")
+            # If AI failed for simple question, let it fall through to general chat fallback below
+            intent = 'general_chat' # Change intent to trigger general chat fallback
 
-    ai_response_text = await get_gemini_response(message.content) # Use original case for AI
 
+    if intent == 'general_chat':
+        # This block handles messages that were not greetings or simple questions,
+        # or were simple questions where the AI failed to respond.
+        prompt_for_ai = f"{SINGLE_PERSONA_PROMPT}\nUser said: {message.content}\nYour response:"
+        ai_response_text = await get_gemini_response(prompt_for_ai)
+        if ai_response_text:
+            logger.info(f"Generated AI general chat response for {message.author.name}.")
+        else:
+            logger.warning(f"AI failed to generate general chat response for {message.author.name}.")
+            # Send a generic error message if AI fails for general chat
+            ai_response_text = "I'm sorry, I couldn't process that right now. Please try again later."
+
+
+    # --- Send the Final AI Response ---
     if ai_response_text:
-        # Send the AI's response back to the channel
         # Discord has a 2000 character limit per message.
         # For longer responses, we'll need to implement message splitting later.
         if len(ai_response_text) > 2000:
@@ -228,12 +205,15 @@ async def on_message(message: discord.Message):
         else:
             await message.channel.send(ai_response_text)
     else:
-        # Send a generic error message if AI fails to respond
-        await message.channel.send("I'm sorry, I couldn't process that right now. Please try again later.")
+        # This case should ideally not be reached if fallbacks are in place,
+        # but as a final safety net:
+        logger.error("No AI response text generated and no fallback available.")
+        await message.channel.send("An unexpected error occurred while generating a response.")
+
 
     # We are not using command_prefix for NLU based interaction,
-    # but if you add traditional commands later, uncomment the line below.
-    # await bot.process_commands(message)
+    # but calling process_commands can help discord.py manage message events.
+    await bot.process_commands(message)
 
 
 # --- Run the Bot ---

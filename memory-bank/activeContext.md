@@ -1,22 +1,21 @@
 # Active Context: AI Persona Discord Bot Collection
 
 ## 1. Current Work Focus
-- Continuing with **Phase 1: Basic Bot Setup & Single Persona Interaction**.
-- Implemented dynamic AI-generated greetings and basic single persona response in `bot.py`.
-- Next: Further refine single persona implementation and begin setting up the basic database.
+- Completed implementation of basic NLU for greetings and simple questions, and basic single persona response in `bot.py`.
+- Resolved the duplicate message issue by implementing a message ID cache and refactoring `on_message` logic.
+- Ready to return to planning for the next steps in Phase 1 and beyond.
 
 ## 2. Recent Changes
 - `bot.py` updated:
-    - `on_message` now sends greeting intents to the AI with time and user context to generate dynamic, in-character greetings.
-    - Includes a fallback to a hardcoded greeting if the AI fails.
-    - `get_gemini_response` function updated to accept an optional `context` parameter.
-- Basic single AI persona response using a placeholder prompt and simple NLU for greetings were previously implemented.
+    - Implemented a message ID cache (`PROCESSED_MESSAGES_CACHE`) to prevent duplicate message processing.
+    - Refactored `on_message` logic to explicitly handle 'greeting', 'simple_question', and 'general_chat' intents, ensuring only one AI response is generated per message.
+    - Included fallbacks for AI failures in greeting and simple question handling.
+- Basic NLU for greetings and simple questions, and basic single persona response were previously implemented.
 
 ## 3. Next Steps (Immediate)
-- Guide user on testing the updated `bot.py` functionality, specifically the dynamic greetings.
-- Refine the `SINGLE_PERSONA_PROMPT` to better capture the desired "Luna" character.
-- Add more basic NLU for simple questions (e.g., "How are you?").
-- Begin setting up the initial SQLite database for minimal state storage.
+- Update Memory Bank files (`activeContext.md`, `progress.md`) to reflect completed work and resolved issues.
+- User to switch back to PLAN MODE.
+- In PLAN MODE, discuss and plan the next steps, likely focusing on setting up the initial SQLite database and further refining the single persona/NLU.
 
 ## 4. Active Decisions & Considerations
 - **Project Scope:** The project aims for a highly natural, NLU-driven interaction model for multiple AI personas, including activities like Truth or Dare. This is a complex undertaking.
