@@ -12,14 +12,14 @@
 - **Single Persona Response:** Bot uses a placeholder persona prompt ("Luna") to generate AI responses for greetings, simple questions, and general chat. Includes fallbacks for AI failures.
 
 ## 2. What's Left to Build (High-Level Roadmap)
-- **Phase 1: Basic Bot Setup & Single Persona Interaction (Mostly Complete)**
+- **Phase 1: Basic Bot Setup & Single Persona Interaction (Complete)**
     - Basic `discord.py` bot structure. (Done)
     - Configuration loading (bot token, API keys, designated channel). (Done)
     - Connection to Discord. (Done)
-    - Implementation of a single AI persona. (Done - basic implementation)
-    - Basic message handling: receive user message, send to AI, display AI response. (Done)
+    - Implementation of a single AI persona. (Done - basic implementation with placeholder prompt)
+    - Basic message handling: receive user message, send to AI, display AI response. (Done - using persona prompt)
     - Simple NLU for greetings and basic questions. (Done - basic implementation)
-    - Initial SQLite database setup for minimal state. (To Do)
+    - Initial SQLite database setup for minimal state. (Done - `database.py` created, integrated for history logging and context)
 - **Phase 2: Multi-Persona Management & Interaction**
     - System for managing multiple persona profiles and prompts.
     - Logic for personas to respond individually and potentially interact with each other in simple ways.
@@ -45,15 +45,15 @@
 
 ## 3. Current Status
 - **Date:** (To be filled dynamically or by user - for now, placeholder)
-- **Overall Progress:** Phase 1 mostly complete. Basic bot functionality with single persona response and simple NLU is working. Duplicate message issue resolved.
-- **Current Focus:** Updating Memory Bank, preparing to switch to PLAN MODE to discuss next steps.
+- **Overall Progress:** Phase 1 complete. Bot connects, handles basic NLU/persona response, logs history, uses history for context, and avoids duplicate messages.
+- **Current Focus:** Guiding user testing of Phase 1 features (database logging, history context). Preparing to plan Phase 2.
 
 ## 4. Known Issues & Blockers (Anticipated / Resolved)
 - **Duplicate Message Responses:** (Resolved) Implemented message ID cache and refactored `on_message` logic.
-- **NLU Complexity:** (Anticipated) Current NLU is very basic. Achieving reliable natural language understanding for diverse user inputs and game states will be a significant challenge in later phases.
-- **AI Context Management:** (Anticipated) Keeping AI personas coherent and in-character over extended conversations within API context limits will require careful management.
-- **API Rate Limits:** (Anticipated) Potential for hitting Discord or Gemini API rate limits, requiring careful management, especially with multiple personas.
-- **Multi-Persona Dynamics:** (Anticipated) Ensuring believable and non-chaotic interactions when multiple AIs and users are conversing will be complex.
+- **NLU Complexity:** (Anticipated) Current NLU is very basic. Phase 3+ will require significant NLU improvements.
+- **AI Context Management:** (Anticipated) Current history context is basic (last N messages). More sophisticated context management (summarization, vector DBs) may be needed later. Context window limits need monitoring.
+- **API Rate Limits:** (Anticipated) Potential for hitting Discord or Gemini API rate limits, requiring careful management, especially with multiple personas and history lookups.
+- **Multi-Persona Dynamics:** (Anticipated) Phase 2 will introduce complexity in managing multiple personas and their interactions.
 
 ## 5. Evolution of Project Decisions
 - **Initial Concept:** A collection of 3-5 AI Discord bots for Truth or Dare.

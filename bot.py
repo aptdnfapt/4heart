@@ -7,6 +7,7 @@ import google.generativeai as genai
 import datetime
 import asyncio
 from collections import deque
+import database # Import the database module
 
 # Load environment variables from .env file
 load_dotenv()
@@ -64,8 +65,10 @@ except Exception as e:
 # --- Placeholder for Single Persona Prompt (Phase 1) ---
 # In later phases, this will be managed by the PersonaManager and will be more complex,
 # including conversation history and dynamic elements.
-SINGLE_PERSONA_PROMPT = """
-You are Luna, a cheerful and friendly AI persona designed to chat with users in a Discord channel.
+# TODO: Move this to a configuration file or the database later
+SINGLE_PERSONA_NAME = "Luna" # Define the persona name
+SINGLE_PERSONA_PROMPT = f"""
+You are {SINGLE_PERSONA_NAME}, a cheerful and friendly AI persona designed to chat with users in a Discord channel.
 You are one of several AI sisters/friends in this channel.
 Respond to the user's message in a friendly and engaging manner.
 Keep your responses relatively concise.
@@ -77,27 +80,49 @@ Keep your responses relatively concise.
 # Adjust the maxlen based on expected message volume and memory constraints.
 PROCESSED_MESSAGES_CACHE = deque(maxlen=1000) # Store up to 1000 recent message IDs
 
-async def get_gemini_response(prompt_text: str) -> str | None:
-    """Gets a response from the Gemini API using the single persona prompt."""
+async def get_gemini_response(full_prompt: str) -> str | None:
+    """Gets a response from the Gemini API."""
     if not model:
         logger.error("Gemini model is not initialized. Cannot get response.")
         return None
     try:
         # For simplicity, using generate_content for now.
         # For chat-like behavior, model.start_chat(history=[]) would be better in later phases.
-        response = await model.generate_content_async(prompt_text)
+        logger.debug(f"Sending prompt to Gemini: {full_prompt[:200]}...") # Log truncated prompt
+        response = await model.generate_content_async(full_prompt)
 
         # Ensure we handle potential API errors or empty responses gracefully
-        if response and response.parts:
-            # Assuming the first part contains the text response
-            candidate = response.candidates[0]
-            if candidate.content and candidate.content.parts:
-                 return "".join(part.text for part in candidate.content.parts if hasattr(part, 'text'))
-            logger.warning(f"Gemini response did not contain expected text parts. Response: {response.text[:100] if hasattr(response, 'text') else 'No text attribute'}")
-            return None # Or some default error message
+        # Add more detailed logging for response structure
+        if response:
+            logger.debug(f"Gemini response received. Candidates: {len(response.candidates) if hasattr(response, 'candidates') else 'N/A'}")
+            if hasattr(response, 'prompt_feedback'):
+                 logger.debug(f"Prompt Feedback: {response.prompt_feedback}")
+
+            # Check candidates and parts more carefully
+            if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
+                candidate = response.candidates[0] # Corrected indentation should be here
+                # Check finish reason if available
+                if hasattr(candidate, 'finish_reason') and candidate.finish_reason != 1: # 1 typically means STOP
+                    logger.warning(f"Gemini response finish reason: {candidate.finish_reason}")
+
+                # Join text parts
+                response_text = "".join(part.text for part in candidate.content.parts if hasattr(part, 'text'))
+                if response_text:
+                    return response_text
+                else:
+                    logger.warning("Gemini response parts were empty.")
+                    return None
+            else:
+                logger.warning("Gemini response did not contain expected content parts.")
+                # Log the raw text if available for debugging
+                try:
+                    logger.warning(f"Raw response text (if available): {response.text[:200]}")
+                except Exception:
+                    logger.warning("Could not access raw response text.")
+                return None
         else:
-            logger.warning(f"Gemini response was empty or malformed. Response: {response}")
-            return None # Or some default error message
+            logger.warning("Gemini response was empty or malformed.")
+            return None
     except Exception as e:
         logger.error(f"Error calling Gemini API: {e}")
         return None
@@ -136,6 +161,16 @@ async def on_message(message: discord.Message):
 
     user_message_content = message.content.lower() # Convert to lowercase for simpler matching
 
+    # --- Log User Message to Database ---
+    await database.add_message(
+        message_id=message.id,
+        channel_id=message.channel.id,
+        user_id=message.author.id,
+        timestamp=message.created_at,
+        username=message.author.name,
+        content=message.content
+    )
+
     # --- Determine Intent (Simple NLU - Phase 1) ---
     # This is a basic intent detection. More sophisticated NLU will be added later.
     intent = 'general_chat' # Default intent
@@ -150,14 +185,24 @@ async def on_message(message: discord.Message):
 
     logger.debug(f"Detected intent: {intent}")
 
+    # --- Fetch Recent Chat History ---
+    recent_messages = await database.get_recent_messages(message.channel.id, limit=10) # Limit history size
+    history_context = "Recent Chat History:\n"
+    if recent_messages:
+        for msg in recent_messages:
+            sender = msg['persona_name'] if msg['persona_name'] else msg['username']
+            history_context += f"{sender}: {msg['content']}\n"
+    else:
+        history_context += "(No recent history)\n"
+
     # --- Generate AI Response Based on Intent ---
     ai_response_text = None
     prompt_for_ai = None
-    context_for_ai = ""
+    context_for_ai = history_context # Start with history context
 
     if intent == 'greeting':
         current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        context_for_ai = f"The current time is {current_time}. A user named {message.author.name} just sent a greeting."
+        context_for_ai += f"\nContext: The current time is {current_time}. User '{message.author.name}' just sent a greeting."
         # Craft a specific prompt for the AI to generate a greeting
         prompt_for_ai = f"{SINGLE_PERSONA_PROMPT}\n{context_for_ai}\nUser's greeting: {message.content}\nGenerate a friendly, in-character greeting response:"
         ai_response_text = await get_gemini_response(prompt_for_ai)
@@ -170,7 +215,7 @@ async def on_message(message: discord.Message):
 
 
     elif intent == 'simple_question':
-        context_for_ai = f"A user named {message.author.name} just asked a simple question."
+        context_for_ai += f"\nContext: User '{message.author.name}' just asked a simple question."
         # Craft a specific prompt for the AI to answer the question
         prompt_for_ai = f"{SINGLE_PERSONA_PROMPT}\n{context_for_ai}\nUser's question: {message.content}\nAnswer the question in character:"
         ai_response_text = await get_gemini_response(prompt_for_ai)
@@ -185,7 +230,8 @@ async def on_message(message: discord.Message):
     if intent == 'general_chat':
         # This block handles messages that were not greetings or simple questions,
         # or were simple questions where the AI failed to respond.
-        prompt_for_ai = f"{SINGLE_PERSONA_PROMPT}\nUser said: {message.content}\nYour response:"
+        context_for_ai += f"\nContext: User '{message.author.name}' sent a message."
+        prompt_for_ai = f"{SINGLE_PERSONA_PROMPT}\n{context_for_ai}\nUser said: {message.content}\nYour response:"
         ai_response_text = await get_gemini_response(prompt_for_ai)
         if ai_response_text:
             logger.info(f"Generated AI general chat response for {message.author.name}.")
@@ -196,20 +242,32 @@ async def on_message(message: discord.Message):
 
 
     # --- Send the Final AI Response ---
+    bot_response_message = None
     if ai_response_text:
         # Discord has a 2000 character limit per message.
         # For longer responses, we'll need to implement message splitting later.
         if len(ai_response_text) > 2000:
             logger.warning("AI response exceeds 2000 characters. Truncating.")
-            await message.channel.send(ai_response_text[:2000])
+            bot_response_message = await message.channel.send(ai_response_text[:2000])
         else:
-            await message.channel.send(ai_response_text)
+            bot_response_message = await message.channel.send(ai_response_text)
     else:
         # This case should ideally not be reached if fallbacks are in place,
         # but as a final safety net:
         logger.error("No AI response text generated and no fallback available.")
-        await message.channel.send("An unexpected error occurred while generating a response.")
+        bot_response_message = await message.channel.send("An unexpected error occurred while generating a response.")
 
+    # --- Log Bot Response to Database ---
+    if bot_response_message:
+        await database.add_message(
+            message_id=bot_response_message.id,
+            channel_id=bot_response_message.channel.id,
+            user_id=bot.user.id, # Bot's user ID
+            timestamp=bot_response_message.created_at,
+            username=bot.user.name, # Bot's username
+            content=bot_response_message.content,
+            persona_name=SINGLE_PERSONA_NAME # Log which persona responded
+        )
 
     # We are not using command_prefix for NLU based interaction,
     # but calling process_commands can help discord.py manage message events.
@@ -217,13 +275,26 @@ async def on_message(message: discord.Message):
 
 
 # --- Run the Bot ---
-if __name__ == "__main__":
+async def main():
+    """Main function to initialize database and run the bot."""
+    try:
+        await database.initialize_database()
+    except Exception as e:
+        logger.critical(f"Database initialization failed: {e}. Exiting.")
+        return # Don't run the bot if DB init fails
+
     if DISCORD_BOT_TOKEN:
         try:
-            bot.run(DISCORD_BOT_TOKEN)
+            await bot.start(DISCORD_BOT_TOKEN)
         except discord.LoginFailure:
             logger.critical("Failed to log in. Please check your DISCORD_BOT_TOKEN.")
         except Exception as e:
             logger.critical(f"An unexpected error occurred while running the bot: {e}")
+        finally:
+            await bot.close() # Ensure bot closes gracefully
+            logger.info("Bot has been shut down.")
     else:
         logger.critical("DISCORD_BOT_TOKEN is not set. Cannot run bot.")
+
+if __name__ == "__main__":
+    asyncio.run(main())
